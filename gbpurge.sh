@@ -1,4 +1,16 @@
 #!/bin/bash
+if ! command -v git --version &> /dev/null
+then
+    echo "Error: git is not installed."
+    return 0;
+fi
+
+if ! command git rev-parse --is-inside-work-tree &> /dev/null
+then
+    echo "Not in a git directory."
+    return 0;
+fi
+
 rep=$(basename `git rev-parse --show-toplevel`)
 tb=$(git rev-parse --abbrev-ref origin/HEAD | cut -c8-)
 
