@@ -1,5 +1,4 @@
 #!/bin/bash
-
 if ! command -v git --version &> /dev/null
 then
     echo "Error: git is not installed."
@@ -14,7 +13,8 @@ fi
 
 defaultBranch=$(git rev-parse --abbrev-ref origin/HEAD | cut -c8-)
 
-git checkout $defaultBranch &>/dev/null 
-git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -d i> /dev/null 2>&1
-
-echo 'Removed branches with "gone" remote branches'
+git checkout $defaultBranch &>/dev/null
+branches=$(git branch -vv | awk '/: gone]/{print $1}')
+echo "Removing the following branches: " 
+echo $branches | tr ' ' '\n'
+git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -D i> /dev/null 2>&1
