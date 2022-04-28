@@ -26,7 +26,7 @@ fs.readdir(directoryPath, {withFileTypes: true}, (err, entries) => {
             git remote prune origin \n 
             set -x \n
             gbpurge \n
-            # rmgone`
+            rmgone`
             ;
          const _path = path.join(directoryPath, dirent.name);
          console.log(`Purging: ${dirent.name}; ${_path}`);
