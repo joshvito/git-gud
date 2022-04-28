@@ -8,8 +8,8 @@ fi
 
 if ! command git rev-parse --is-inside-work-tree &> /dev/null
 then
-	echo "Not in a git directory"
-	exit
+    echo "Not in a git directory."
+    exit
 fi
 
 defaultBranch=$(git rev-parse --abbrev-ref origin/HEAD | cut -c8-)
