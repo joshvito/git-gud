@@ -32,7 +32,11 @@ if [ -f ~/.bashrc ]; then
 fi
 
 alias prunerize='node ~/.util/prunerizer ~/path/to/repos/for/prunering'
-alias alias='alias | grep -one "^alias [a-z]*" | sed -e "s/alias //g"'
+
+# list all your alias commands
+aliases() {
+	command alias | grep -one "^alias [a-z]*" | awk '{print $2}'
+}
 ```
 
 Then in your bash terminal, run `source ~/bash_profile`;
