@@ -15,6 +15,12 @@ defaultBranch=$(git rev-parse --abbrev-ref origin/HEAD | cut -c8-)
 
 git checkout $defaultBranch &>/dev/null
 branches=$(git branch -vv | awk '/: gone]/{print $1}')
-echo "Removing the following branches: " 
-echo $branches | tr ' ' '\n'
-git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -D i> /dev/null 2>&1
+
+if [ ! -z "$branches" ]
+then
+    echo "Removing the following branches: " 
+    echo $branches | tr ' ' '\n'
+    git branch -vv | awk '/: gone]/{print $1}' | xargs git branch -D >> /dev/null 2>&1
+fi
+
+return 0;
