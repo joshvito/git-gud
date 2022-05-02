@@ -16,7 +16,7 @@ defaultBranch=$(git rev-parse --abbrev-ref origin/HEAD | cut -c8-)
 git checkout $defaultBranch &>/dev/null
 branches=$(git branch -vv | awk '/: gone]/{print $1}')
 
-if [ ! -z "$branches" ]
+if [ -n "$branches" ]
 then
     echo "Removing the following branches: " 
     echo $branches | tr ' ' '\n'
