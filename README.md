@@ -44,7 +44,7 @@ Then in your bash terminal, run `source ~/bash_profile`;
 ## Script Summaries
 
 ### prunerizer.js
-A nodejs script that will read the passed in directory parameter for any directories it contains. Then for each directory it checks out the HEAD branch, pulls latest, prune the origin, and delete local branches that have been merged or gone (deleted remote);
+A nodejs script that will read the passed in directory parameter for any directories it contains. Then for each directory it checks out the remote branch that is the HEAD target, pulls latest, prune the origin, and delete local branches that have been merged or gone (deleted remote);
 
 ### pr-current.sh
 Uses az cli to create a PR for the currently selected branch in azure dev.azure.com. 
