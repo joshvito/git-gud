@@ -12,7 +12,7 @@ do
   case "$opt" in
     t) tit="$OPTARG";;
     d) desc="$OPTARG";;
-	n) wi="$OPTARG";;
+    n) wi="$OPTARG";;
     \?) echo "Invalid option: -$OPTARG" >&2
         return 1;;
   esac
