@@ -40,6 +40,9 @@ project_details:
   type: $repoType
   complexity: $complexity
   is_legacy: false
+  has_collegiatelink_connection: true 
+  has_cross_domain_mappings: true
+  team: Engage
 ---
 
 # $repoName
@@ -142,9 +145,14 @@ include {
 }
 EOF
 
-#pushd lib/terraform/live/non-prod/_global/devops
-#terragrunt apply
-#popd
+pushd lib/terraform/live/non-prod/_global/devops
+terragrunt apply
+popd
+
+git remote add origin https://dev.azure.com/campuslabs/CollegiateLink/_git/$repoName && \
+git add . && \
+git commit -m "Initial Commit" && \
+git push origin main
 
 cat << EOF
 Once the devops Module has been applied, commit all your changes.

@@ -6,6 +6,8 @@ A collection of often used git related scripts
 * az cli (pr-current.sh)
 * bash shell
 * git
+* Terrafrom
+* Terragrunt
 
 ## Setup Instructions
 
@@ -19,6 +21,7 @@ A collection of often used git related scripts
 alias gbpurge='source ~/.util/gbpurge.sh'
 alias prcurrent='source ~/.util/pr-current.sh'
 alias rmgone='source ~/.util/rmgone.sh'
+alias repoizer='source ~/.util/repoizer.sh'
 ```
 
 Then in your `.bash_profile` file, you can add the `prunerizer script as an alias too.`
@@ -48,9 +51,23 @@ A nodejs script that will read the passed in directory parameter for any directo
 
 ### pr-current.sh
 Uses az cli to create a PR for the currently selected branch in azure dev.azure.com. 
+#### Optional Flags:
+| Flag | Description |
+| :------: | ----------- |
+| -t | Sets the Title of the PR |
+| -d | Sets the Description of the PR |
+| -n | Sets the Work Item # of the PR |
 
 ### gbpurge.sh
 Called from `prunerizer.js`, it will checkout the HEAD's branch, and delete any local branches that have been `[merged]`;
 
 ### rmgone.sh 
 Called from `prunerizer.js`, it will checkout the HEAD's branch, and delete any local branches that are deleted, aka `[gone]`;
+
+### repoizer.sh
+A bash script for setting up new Engage repos. Follows the Student Engagement [Wiki document](https://dev.azure.com/campuslabs/Student%20Engagement/_wiki/wikis/Student-Engagement.wiki/1242/Repository-From-Scratch)
+#### Requires:
+* Terraform
+* Terragrunt
+* Azure Cli
+* Git
