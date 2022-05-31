@@ -4,11 +4,38 @@ repoName=''
 serviceName=''
 ownerEmail=''
 hasMigrations=false
-repoType='Pillar'
-complexity='Low'
+repoType=''
+complexity=''
+collegiatelinkConnection=true
+crossDomainMappings=false
+team='Engage'
 
-read -p "Repo Name: " repoName
-read -p "Owner Email: " ownerEmail
+promptQuestion() {
+  local response;
+
+  while true; do
+    read -erp "$1: " response
+
+    if [[ ! -z $response ]]; then
+        break
+    fi
+  done
+  echo "$response"
+}
+
+repoName=$(promptQuestion "Repo Name")
+ownerEmail=$(promptQuestion "Owner Email")
+
+read -p "Team [Engage]: " team
+team=${team:-Engage}
+read -p "Repo Type [Pillar]: " repoType
+repoType=${repoType:-Pillar}
+read -p "Complexity [Low]: " complexity
+complexity=${complexity:-Low}
+read -p "Has Collegiatelink Connection [true]: " collegiatelinkConnection
+collegiatelinkConnection=${collegiatelinkConnection:-true}
+read -p "Has Cross Domain Mappings [false]: " crossDomainMappings
+crossDomainMappings=${crossDomainMappings:-true}
 
 serviceName=$(echo "$repoName" | sed -e 's/[^a-zA-Z]/-/g' -e 's/-{2,}/-/g' -e 's/\(.*\)/\L\1/')
 
@@ -40,8 +67,8 @@ project_details:
   type: $repoType
   complexity: $complexity
   is_legacy: false
-  has_collegiatelink_connection: true 
-  has_cross_domain_mappings: true
+  has_collegiatelink_connection: $collegiatelinkConnection 
+  has_cross_domain_mappings: $crossDomainMappings
   team: Engage
 ---
 
@@ -154,10 +181,4 @@ git add . && \
 git commit -m "Initial Commit" && \
 git push origin main
 
-cat << EOF
-Once the devops Module has been applied, commit all your changes.
-Then you can open up your new Repository in Azure DevOps and grab the commands from the "Push an existing repository from command line".
-Run those commands and then your code should all be in Azure DevOps ready to go!
-
-Now you can start Terraforming your infrastructure!
-EOF
+echo "All Done!"
