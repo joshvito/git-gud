@@ -3,9 +3,9 @@ A collection of often used git related scripts
 
 ## Required programs
 * Nodejs
-* az cli (pr-current.sh)
 * bash shell
 * git
+* az cli (pr-current.sh, repoizer.sh)
 * Terraform (repoizer.sh)
 * Terragrunt (repoizer.sh)
 
