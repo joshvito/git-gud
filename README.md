@@ -6,8 +6,8 @@ A collection of often used git related scripts
 * az cli (pr-current.sh)
 * bash shell
 * git
-* Terraform
-* Terragrunt
+* Terraform (repoizer.sh)
+* Terragrunt (repoizer.sh)
 
 ## Setup Instructions
 
