@@ -9,6 +9,7 @@ complexity=''
 collegiatelinkConnection=true
 crossDomainMappings=false
 team='Engage'
+schema=''
 
 promptQuestion() {
   local response;
@@ -34,8 +35,10 @@ read -p "Complexity [Low]: " complexity
 complexity=${complexity:-Low}
 read -p "Has Collegiatelink Connection [true]: " collegiatelinkConnection
 collegiatelinkConnection=${collegiatelinkConnection:-true}
+read -p "Has Migrations [false]: " hasMigrations
+hasMigrations=${hasMigrations:-false}
 read -p "Has Cross Domain Mappings [false]: " crossDomainMappings
-crossDomainMappings=${crossDomainMappings:-true}
+crossDomainMappings=${crossDomainMappings:-false}
 
 serviceName=$(echo "$repoName" | sed -e 's/[^a-zA-Z]/-/g' -e 's/-{2,}/-/g' -e 's/\(.*\)/\L\1/')
 
@@ -76,6 +79,196 @@ project_details:
 
 Welcome.
 EOF
+
+touch build/ci.yml
+
+cat <<"EOF" > build/ci.yml
+name: $(Year:yyyy).$(Month).$(DayOfMonth)-beta$(Rev:r)
+
+parameters:
+  - name: onlySwapTest
+    displayName: Only Swap Test
+    type: boolean
+    default: false
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - src
+      - test
+
+pool:
+  vmImage: ubuntu-latest
+
+resources:
+  repositories:
+    - repository: self
+    - repository: templates
+      type: git
+      name: Infra.PipelineTemplates
+
+stages:
+  - stage: Build
+    condition: ne(${{ parameters.onlySwapTest }}, true)
+    jobs:
+      - job: Build
+        steps:
+          - template: shared/engage-ci-setup.yml@templates
+          - template: netcore/restore.yml@templates
+          - template: netcore/build.yml@templates
+          - template: netcore/test.yml@templates
+          - template: netcore/pack-contracts.yml@templates
+          - template: netcore/publish-web.yml@templates
+            parameters:
+              project: '**/*.Api/*.csproj'
+          - template: shared/copy-artifacts.yml@templates
+
+  - stage: Deploy
+    dependsOn:
+      - Build
+    condition: and(succeeded(), ne(${{ parameters.onlySwapTest }}, true))
+    jobs:
+      - template: shared/deploy-slot-matrix.yml@templates
+        parameters:
+          azureSubscription: CollegiateLink Dev/Test
+          environment: NonProd
+          artifact: api
+          package: '*Api.zip'
+      - template: shared/deploy-slot-matrix.yml@templates
+        parameters:
+          azureSubscription: CollegiateLink Production
+          environment: Prod
+          artifact: api
+          package: '*Api.zip'
+
+  - stage: Swap
+    dependsOn:
+      - Deploy
+    condition: or(eq(${{ parameters.onlySwapTest }}, true), and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main')))
+    jobs:
+      - template: shared/swap-slot-matrix.yml@templates
+        parameters:
+          azureSubscription: CollegiateLink Dev/Test
+          environment: NonProd
+          artifact: api
+          healthCheckPath: /
+      - ${{ if ne(parameters.onlySwapTest, true) }}:
+        - template: shared/swap-slot-matrix.yml@templates
+          parameters:
+            azureSubscription: CollegiateLink Production
+            environment: Prod
+            artifact: api
+            healthCheckPath: /
+
+  - stage: Packages
+    dependsOn:
+      - Build
+    condition: and(succeeded(), ne(${{ parameters.onlySwapTest }}, true))
+    jobs:
+      - template: nuget/push-notify.yml@templates
+        parameters:
+          pillar: Events
+          defaultBranchName: main
+EOF
+
+if [ "$hasMigrations" = true ] ; then
+
+read -p "Schema [dbo]: " schema
+schema=${schema:-dbo}
+
+mkdir -p lib/migrations/sql
+
+touch build/migtations.yml
+
+cat <<"EOF" > build/migtations.yml
+name: $(Year:yyyy).$(Month).$(DayOfMonth).$(Rev:r)
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - lib/migrations
+
+pool:
+  vmImage: ubuntu-latest
+
+resources:
+  repositories:
+    - repository: self
+    - repository: templates
+      type: git
+      name: Infra.PipelineTemplates
+
+stages:
+  - stage: Migrate
+    jobs:
+      - template: database/flyway-migrations.yml@templates
+        parameters:
+EOF
+
+cat <<EOF >> build/migtations.yml
+          sqlSchemas: $schema
+EOF
+
+touch lib/migrations/flyway.sh
+cat <<"EOF" > lib/migrations/flyway.sh
+#!/usr/bin/env zsh
+
+command="$1"
+if [[ -z "$command" ]]; then
+  command="info"
+fi
+
+case "$2" in
+  "olddev")
+    server="azrdev"
+    database="collegiatelink-dev"
+    ;;
+  "test")
+    server="sql-se-infra-monolithdatabase-test-001"
+    database="sqldb-se-infra-monolithdatabase-test-001"
+    ;;
+  "usa")
+    server="collegiatelink"
+    database="collegiatelink"
+    ;;
+  "can")
+    server="collegiatelink-can"
+    database="collegiatelink-can"
+    ;;
+  "sea")
+    server="sql-se-infra-monolithdatabase-sea-001"
+    database="sqldb-se-infra-monolithdatabase-sea-001"
+    ;;
+  *)
+    server="sql-se-infra-monolithdatabase-dev-001"
+    database="sqldb-se-infra-monolithdatabase-dev-001"
+    isDev=1
+    ;;
+esac
+
+flyway $command \
+  -url="jdbc:sqlserver://$server.database.windows.net:1433;database=$database;encrypt=true" \
+  -jdbcProperties.accessToken="$(az account get-access-token --resource https://database.windows.net/ --query accessToken --output tsv)" \
+  -user="" \
+  -password="" \
+EOF
+
+cat <<EOF >> lib/migrations/flyway.sh
+  -schemas="$schema" \\
+EOF
+
+cat <<"EOF" >> lib/migrations/flyway.sh
+  -table="FlywayMigrationHistory" \
+  -placeholders.isDev=$isDev \
+  -baselineVersion=0003
+EOF
+fi
 
 touch build/terraform.yml
 
