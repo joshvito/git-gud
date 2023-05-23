@@ -5,9 +5,10 @@ A collection of often used git related scripts
 * Nodejs
 * bash shell
 * git
-* az cli (pr-current.sh, repoizer.sh)
+* az cli (pr-current.sh, repoizer.sh, pipelinerizer.sh)
 * Terraform (repoizer.sh)
 * Terragrunt (repoizer.sh)
+* jq (pipelinerizer.sh) 
 
 ## Setup Instructions
 
@@ -71,3 +72,9 @@ A bash script for setting up new Engage repos. Follows the Student Engagement [W
 * Terragrunt
 * Azure Cli
 * Git
+
+### pipelinerizer.sh
+A bash script that searches the Collegiatelink project for pipelines by name and runs each of them against the `main` branch.
+#### Requires:
+* Azure Cli
+* jq
