@@ -42,5 +42,5 @@ fi
 # Iterate over the pipeline names and trigger them against the main branch
 echo $pipeline_names | jq -c '.[]'| while read i; do
     echo "Triggering pipeline: $i"
-    az pipelines build queue --definition-name "$name" --branch 'main'
+    az pipelines build queue --definition-name "$name" --branch 'main' --org "https://dev.azure.com/campuslabs/" --project "CollegiateLink"
 done
