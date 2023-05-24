@@ -26,9 +26,12 @@ az account show
 # Search for build pipelines with "terraform" in their name
 pipeline_names=$(az pipelines build definition list --org "https://dev.azure.com/campuslabs/" --project "CollegiateLink" --query "[?contains(name, '$tit')].name" -o json)
 
+# DEBUG
+# echo $pipeline_names > output.json
+
 echo We found the following pipelines to run.
-echo $pipeline_names | jq -c '.[]'| while read i; do
-    echo "$i"
+echo $pipeline_names | jq -c '.[]' | while read i; do
+    echo $i
 done
 
 read -p "Are you sure you want to run all of these piplines? [Y]: " confirm
@@ -40,7 +43,9 @@ if [ "${confirm^^}" != "Y" ]; then
 fi
 
 # Iterate over the pipeline names and trigger them against the main branch
-echo $pipeline_names | jq -c '.[]'| while read i; do
-    echo "Triggering pipeline: $i"
-    az pipelines build queue --definition-name "$i" --branch 'main' --org "https://dev.azure.com/campuslabs/" --project "CollegiateLink"
+echo $pipeline_names | jq -rc '.[]' | while read i; do
+    # echo "Triggering pipeline: $i"
+    x=$(echo "$i"  | tr -d '\r')
+    echo $x
+    az pipelines build queue --definition-name "$x" --branch 'main' --org 'https://dev.azure.com/campuslabs/' --project 'CollegiateLink'
 done
