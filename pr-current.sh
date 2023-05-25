@@ -38,4 +38,4 @@ then
 	desc=$tit
 fi
 
-az repos pr create --detect --auto-complete true --delete-source-branch true --description "$desc" --repository "$rep" --source-branch "$bn" --squash false --target-branch "$tb" --title "$tit" --output table --work-items "$wi"
+az repos pr create --detect --auto-complete true --delete-source-branch true --description "$desc" --repository "$rep" --source-branch "$bn" --squash true --target-branch "$tb" --title "$tit" --output table --work-items "$wi"
