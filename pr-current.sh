@@ -38,6 +38,13 @@ then
 	desc=$tit
 fi
 
+if type jq &>/dev/null; then
+    echo "jq is available"
+else
+    echo "jq is not available and is required"
+    exit 0;
+fi
+
 pull_request=$(az repos pr create --detect --auto-complete true --delete-source-branch true --description "$desc" --repository "$rep" --source-branch "$bn" --squash true --target-branch "$tb" --title "$tit" --output json --work-items "$wi")
 
 pull_request_id=$(echo $pull_request | jq -r '.pullRequestId');
