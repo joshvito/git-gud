@@ -39,7 +39,7 @@ then
 fi
 
 if type jq &>/dev/null; then
-    echo "jq is available"
+    echo "Creating a PR.... hang on to your horses."
 else
     echo "jq is not available and is required"
     exit 0;
