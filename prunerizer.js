@@ -5,6 +5,7 @@ const { exec } = require('child_process');
 
 var args = process.argv.slice(2);
 var directoryPath = args[0] || __dirname;
+var isWin = process.platform === "win32";
 
 fs.readdir(directoryPath, {withFileTypes: true}, (err, entries) => {
     anon();
@@ -31,7 +32,7 @@ fs.readdir(directoryPath, {withFileTypes: true}, (err, entries) => {
         console.log(`Purging: ${dirent.name}; ${_path}`);
         exec(command, {
              cwd: _path,
-             shell: 'C:\\Program Files\\Git\\bin\\bash.exe',
+             shell: isWin ? 'C:\\Program Files\\Git\\bin\\bash.exe' : 'bash',
              windowsHide: true,
             }, (error, stdout, stderr) => {
                 console.log(error || stdout)
