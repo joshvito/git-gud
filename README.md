@@ -23,6 +23,7 @@ alias gbpurge='source ~/.util/gbpurge.sh'
 alias prcurrent='source ~/.util/pr-current.sh'
 alias rmgone='source ~/.util/rmgone.sh'
 alias repoizer='source ~/.util/repoizer.sh'
+alias pipelinerizer='source ~/.util/pipelinerizer.sh'
 ```
 
 Then in your `.bash_profile` file, you can add the `prunerizer script as an alias too.`

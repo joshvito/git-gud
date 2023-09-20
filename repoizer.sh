@@ -40,7 +40,7 @@ hasMigrations=${hasMigrations:-false}
 read -p "Has Cross Domain Mappings [false]: " crossDomainMappings
 crossDomainMappings=${crossDomainMappings:-false}
 
-serviceName=$(echo "$repoName" | sed -e 's/[^a-zA-Z]/-/g' -e 's/-{2,}/-/g' -e 's/\(.*\)/\L\1/')
+serviceName=$(echo "$repoName" | sed -e 's/[^a-zA-Z]/-/g' -e 's/-{2,}/-/g' | awk '{print tolower($0)}'
 
 mkdir $repoName
 cd $repoName

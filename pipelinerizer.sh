@@ -1,30 +1,52 @@
 #!/bin/bash
 
 tit=''
+query=''
 confirm=''
 OPTIND=1
 
-while getopts ":t:" opt 
+while getopts ":tq:" opt 
 do
   case "$opt" in
     t) tit="$OPTARG";;
+    q) query="$OPTARG";;
     \?) echo "Invalid option: -$OPTARG" >&2
         return 1;;
   esac
 done
 
-if [ -z "$tit" ]
+# Query overrides the search for a title so if we have a query, skip asking about a title
+if [[ -z "$query" ]] && [ -z "$tit" ]
 then
 	read -p "Build pipline search term (case sensitive): [Terraform]" tit
     tit=${tit:-Terraform}
 fi
 
-# show current account
-echo "Running builds as user: "
-az account show
+# At this point we should have a query or a title, so lets set the query to be the title if we dont have a query
+if [[ -z "$query" ]] && [ ! -z "$tit" ]
+then
+    query="[?contains(name, '${tit}')].name" 
+fi
+
+az account show  >/dev/null 2>&1
+status=$?
+
+if [ "$status" != "0" ]
+then
+    az login --use-device-code --tenant 809fd6c8-b876-47a9-abe2-8be2888f4a55
+fi
+
+az account show  >/dev/null 2>&1
+status=$?
+
+if [ "$status" != "0" ]
+then
+    echo 'Unable to login to azure';
+    exit;
+fi
 
 # Search for build pipelines with "terraform" in their name
-pipeline_names=$(az pipelines build definition list --org "https://dev.azure.com/campuslabs/" --project "CollegiateLink" --query "[?contains(name, '$tit')].name" -o json)
+pipeline_names=$(az pipelines build definition list --org "https://dev.azure.com/campuslabs/" --project "CollegiateLink" --query "$query" -o json)
 
 # DEBUG
 # echo $pipeline_names > output.json
@@ -37,7 +59,7 @@ done
 read -p "Are you sure you want to run all of these piplines? [Y]: " confirm
 confirm=${confirm:-Y}
 
-if [ "${confirm^^}" != "Y" ]; then
+if [ "${confirm}" != "Y" ] &&  [ "${confirm}" != "y" ]; then
     echo "Thanks for playing. Have a nice day."
     exit 0;
 fi
