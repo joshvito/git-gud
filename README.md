@@ -8,7 +8,7 @@ A collection of often used git related scripts
 * az cli (pr-current.sh, repoizer.sh, pipelinerizer.sh)
 * Terraform (repoizer.sh)
 * Terragrunt (repoizer.sh)
-* jq (pipelinerizer.sh) 
+* jq (pipelinerizer.sh, pr-current.sh) 
 
 ## Setup Instructions
 
