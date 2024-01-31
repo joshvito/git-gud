@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if ! [ -x "$(command -v az)" ] || ! [ -x "$(command -v terraform)" ] || ! [ -x "$(command -v terragrunt)" ] || ! [ -x "$(command -v git)" ]
+then
+  echo "You must have Azure Cli, Terraform, Terragrunt, and Git installed to use this utility";
+  return;
+fi
+
 repoName=''
 serviceName=''
 ownerEmail=''
@@ -10,6 +16,23 @@ collegiatelinkConnection=true
 crossDomainMappings=false
 team='Engage'
 schema=''
+
+az account show  >/dev/null 2>&1
+status=$?
+
+if [ "$status" != "0" ]
+then
+    az login --use-device-code --tenant 809fd6c8-b876-47a9-abe2-8be2888f4a55
+fi
+
+az account show  >/dev/null 2>&1
+status=$?
+
+if [ "$status" != "0" ]
+then
+    echo 'Unable to login to azure';
+    return;
+fi
 
 promptQuestion() {
   local response;
@@ -40,7 +63,7 @@ hasMigrations=${hasMigrations:-false}
 read -p "Has Cross Domain Mappings [false]: " crossDomainMappings
 crossDomainMappings=${crossDomainMappings:-false}
 
-serviceName=$(echo "$repoName" | sed -e 's/[^a-zA-Z]/-/g' -e 's/-{2,}/-/g' | awk '{print tolower($0)}'
+serviceName=$(echo "$repoName" | sed -e 's/[^a-zA-Z]/-/g' -e 's/-{2,}/-/g' | awk '{print tolower($0)}')
 
 mkdir $repoName
 cd $repoName
@@ -118,14 +141,12 @@ stages:
         steps:
           - template: shared/engage-ci-setup.yml@templates
           - template: netcore/restore.yml@templates
+          - template: shared/snyk-scan.yml@templates
           - template: netcore/build.yml@templates
           - template: netcore/test.yml@templates
           - template: netcore/pack-contracts.yml@templates
-          - template: netcore/publish-web.yml@templates
-            parameters:
-              project: '**/*.Api/*.csproj'
+          - template: netcore/publish-web.yml@templates            
           - template: shared/copy-artifacts.yml@templates
-
   - stage: Deploy
     dependsOn:
       - Build
@@ -136,13 +157,13 @@ stages:
           azureSubscription: CollegiateLink Dev/Test
           environment: NonProd
           artifact: api
-          package: '*Api.zip'
+          package: '*.zip'
       - template: shared/deploy-slot-matrix.yml@templates
         parameters:
           azureSubscription: CollegiateLink Production
           environment: Prod
           artifact: api
-          package: '*Api.zip'
+          package: '*.zip'
 
   - stage: Swap
     dependsOn:
@@ -154,14 +175,14 @@ stages:
           azureSubscription: CollegiateLink Dev/Test
           environment: NonProd
           artifact: api
-          healthCheckPath: /
+          healthCheckPath: /healthcheck
       - ${{ if ne(parameters.onlySwapTest, true) }}:
         - template: shared/swap-slot-matrix.yml@templates
           parameters:
             azureSubscription: CollegiateLink Production
             environment: Prod
             artifact: api
-            healthCheckPath: /
+            healthCheckPath: /healthcheck
 
   - stage: Packages
     dependsOn:
