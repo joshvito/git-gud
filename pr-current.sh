@@ -5,7 +5,9 @@ bn=$(git branch --show-current)
 tit=''
 desc=''
 wi=''
-ac=false
+useAc=''
+ac=true
+draft=false
 optMode=false
 tb=$(git rev-parse --abbrev-ref origin/HEAD | cut -c8-)
 
@@ -69,12 +71,13 @@ Help()
    # Display Help
    echo "Makes a pull request in Azure DevOps"
    echo
-   echo "Syntax: prcurrent [-t|d|n|c|h]"
+   echo "Syntax: prcurrent [-t|d|n|r|m|h]"
    echo "options:"
    echo "t  <Title>             Set the Pull Request title."
    echo "d  <Description>       Set the Pull Request description."
    echo "n  <DevOps Ticket #>   Set the ticket number."
-   echo "c                      Set the Pull Request to use Auto Complete"
+   echo "r                      Set the Pull Request to use draft mode (Rough Draft)."
+   echo "m                      Set the Pull Request to use manual Complete mode."
    echo "h                      Show this help message."
    echo
 }
@@ -84,23 +87,34 @@ Help()
 ############################################################
 SetVars()
 {
-  if (! $optMode) && [ -z "$tit" ]
+  if [ -z "$tit" ]
   then
     read -p "PR Title: " tit
   fi
 
-  if (! $optMode) && [ -z "$desc" ]
+  if ( ! $optMode ) && [ -z "$desc" ]
   then
     read -p "PR Description: " desc
   fi
 
-  if (! $optMode) && [ -z "$wi" ]
+  if [ -z "$wi" ]
   then
     read -p "Work Item Number(s): " wi
   fi
+
+  if ( ! $optMode ) && [ -z "$useAc" ]
+  then
+    read -p "Use Auto Complete [Y]: " useAc
+    useAc=${useAc:-Y}
+    
+    if [ "$useAc" != "Y" ] && [ "$useAc" != "y" ]
+    then
+      ac=false
+    fi
+  fi
 }
 
-while getopts ":ht:d:n:c" opt 
+while getopts ":ht:d:n:m:r" opt 
 do
   optMode=true;
   case "$opt" in
@@ -109,19 +123,14 @@ do
     t) tit="$OPTARG";;
     d) desc="$OPTARG";;
     n) wi="$OPTARG";;
-    c) ac=true;;
+    m) ac=false;;
+    r) draft=true;;
     \?) echo "Invalid option: -$OPTARG" >&2
         return 1;;
   esac
 done
 
 SetVars
-
-while [ -z "$tit" ]
-do
-  optMode=false;
-  SetVars
-done
 
 if [ -z "$desc" ]
 then
@@ -154,7 +163,7 @@ else
     return 1;
 fi
 
-pull_request=$(az repos pr create --detect --auto-complete $ac --delete-source-branch true --description "$desc" --repository "$rep" --source-branch "$bn" --squash true --target-branch "$tb" --title "$tit" --output json --work-items "$wi")
+pull_request=$(az repos pr create --detect --auto-complete $ac --draft $draft --delete-source-branch true --description "$desc" --repository "$rep" --source-branch "$bn" --squash true --target-branch "$tb" --title "$tit" --output json --work-items "$wi")
 
 draft_str="false"
 if [ "$draft" -eq 1 ]; then
