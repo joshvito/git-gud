@@ -189,10 +189,7 @@ stages:
       - Build
     condition: and(succeeded(), ne(${{ parameters.onlySwapTest }}, true))
     jobs:
-      - template: nuget/push-notify.yml@templates
-        parameters:
-          pillar: Events
-          defaultBranchName: main
+      - template: nuget/push.yml@templates
 EOF
 
 if [ "$hasMigrations" = true ] ; then
