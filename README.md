@@ -79,3 +79,6 @@ A bash script that searches the Collegiatelink project for pipelines by name and
 #### Requires:
 * Azure Cli
 * jq
+
+### maintainerizer.js
+A nodejs script that will read the passed in directory parameter (defaults to location of script execution) for any directories it contains. Then for each directory it turns on `git maintenance` via the `start` command;
