@@ -75,7 +75,7 @@ A bash script for setting up new Engage repos. Follows the Student Engagement [W
 * Git
 
 ### pipelinerizer.sh
-A bash script that searches the Collegiatelink project for pipelines by name and runs each of them against the `main` branch.
+A bash script that searches the Engage project for pipelines by name and runs each of them against the `main` branch.
 #### Requires:
 * Azure Cli
 * jq
