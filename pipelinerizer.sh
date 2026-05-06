@@ -2,30 +2,35 @@
 
 tit=''
 query=''
+pattern=''
 confirm=''
 OPTIND=1
 
-while getopts ":tq:" opt 
+while getopts ":tq:p:" opt
 do
   case "$opt" in
     t) tit="$OPTARG";;
     q) query="$OPTARG";;
+    p) pattern="$OPTARG";;
     \?) echo "Invalid option: -$OPTARG" >&2
         return 1;;
   esac
 done
 
-# Query overrides the search for a title so if we have a query, skip asking about a title
-if [[ -z "$query" ]] && [ -z "$tit" ]
+# Pattern overrides query/title; query overrides title. Only prompt if none given.
+if [[ -z "$pattern" ]] && [[ -z "$query" ]] && [ -z "$tit" ]
 then
 	read -p "Build pipline search term (case sensitive): [Terraform]" tit
     tit=${tit:-Terraform}
 fi
 
-# At this point we should have a query or a title, so lets set the query to be the title if we dont have a query
-if [[ -z "$query" ]] && [ ! -z "$tit" ]
+# Pattern path: pull all names, filter client-side with jq regex.
+if [[ -n "$pattern" ]]
 then
-    query="[?contains(name, '${tit}')].name" 
+    query="[].name"
+elif [[ -z "$query" ]] && [ ! -z "$tit" ]
+then
+    query="[?contains(name, '${tit}')].name"
 fi
 
 az account show  >/dev/null 2>&1
@@ -47,6 +52,12 @@ fi
 
 # Search for build pipelines with "terraform" in their name
 pipeline_names=$(az pipelines build definition list --org "https://dev.azure.com/Encoura/" --project "Engage" --query "$query" -o json)
+
+# If regex pattern given, filter client-side
+if [[ -n "$pattern" ]]
+then
+    pipeline_names=$(echo "$pipeline_names" | jq --arg pat "$pattern" '[.[] | select(test($pat))]')
+fi
 
 # DEBUG
 # echo $pipeline_names > output.json
