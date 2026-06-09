@@ -88,7 +88,7 @@ fi
 echo "Checking account state..."
 if ! az ad signed-in-user show >/dev/null 2>&1; then
   echo "Logging into Azure..."
-  az login --use-device-code --tenant 809fd6c8-b876-47a9-abe2-8be2888f4a55
+  az login --use-device-code --tenant 6b77b66a-12e3-422f-a0cb-e0248ed409f4
 fi
 
 if ! az ad signed-in-user show >/dev/null 2>&1; then
