@@ -5,11 +5,8 @@ bn=$(git branch --show-current)
 tit=''
 desc=''
 wi=''
-useAc=''
-ac=1        # 1 = true (auto-complete), 0 = false
-draft=0     # 1 = true, 0 = false
-optMode=0   # 1 = true, 0 = false
-gitEditor=$(git config core.editor)
+ac=false
+optMode=false
 tb=$(git rev-parse --abbrev-ref origin/HEAD | cut -c8-)
 
 ############################################################
@@ -64,36 +61,90 @@ SetVars() {
 
 OPTIND=1
 
-# Parse short options with getopts
-while getopts ":ht:d:n:mr" opt 
+############################################################
+# Help                                                     #
+############################################################
+Help()
+{
+   # Display Help
+   echo "Makes a pull request in Azure DevOps"
+   echo
+   echo "Syntax: prcurrent [-t|d|n|c|h]"
+   echo "options:"
+   echo "t  <Title>             Set the Pull Request title."
+   echo "d  <Description>       Set the Pull Request description."
+   echo "n  <DevOps Ticket #>   Set the ticket number."
+   echo "c                      Set the Pull Request to use Auto Complete"
+   echo "h                      Show this help message."
+   echo
+}
+
+############################################################
+# Set PR Vars                                              #
+############################################################
+SetVars()
+{
+  if (! $optMode) && [ -z "$tit" ]
+  then
+    read -p "PR Title: " tit
+  fi
+
+  if (! $optMode) && [ -z "$desc" ]
+  then
+    read -p "PR Description: " desc
+  fi
+
+  if (! $optMode) && [ -z "$wi" ]
+  then
+    read -p "Work Item Number(s): " wi
+  fi
+}
+
+while getopts ":ht:d:n:c" opt 
 do
-  optMode=1;
+  optMode=true;
   case "$opt" in
-    h) Help; return 1;;
+    h) Help 
+      return 1;;
     t) tit="$OPTARG";;
     d) desc="$OPTARG";;
     n) wi="$OPTARG";;
-    m) ac=0;;
-    r) draft=1;;
-    \?) echo "Invalid option: -$OPTARG" >&2; return 1;;
+    c) ac=true;;
+    \?) echo "Invalid option: -$OPTARG" >&2
+        return 1;;
   esac
 done
 
 SetVars
 
-if [ -z "$desc" ]; then
-  desc="$tit"
+while [ -z "$tit" ]
+do
+  optMode=false;
+  SetVars
+done
+
+if [ -z "$desc" ]
+then
+	desc=$tit
 fi
 
 echo "Checking account state..."
-if ! az ad signed-in-user show >/dev/null 2>&1; then
-  echo "Logging into Azure..."
-  az login --use-device-code --tenant 6b77b66a-12e3-422f-a0cb-e0248ed409f4
+az account show  >/dev/null 2>&1
+status=$?
+
+if [ "$status" != "0" ]
+then
+    echo "Logging into Azure..."
+    az login --use-device-code --tenant 809fd6c8-b876-47a9-abe2-8be2888f4a55
 fi
 
-if ! az ad signed-in-user show >/dev/null 2>&1; then
-  echo "Unable to login to Azure"
-  return 1
+az account show  >/dev/null 2>&1
+status=$?
+
+if [ "$status" != "0" ]
+then
+    echo 'Unable to login to Azure';
+    return;
 fi
 
 if type jq &>/dev/null; then
@@ -103,10 +154,7 @@ else
     return 1;
 fi
 
-ac_str="true"
-if [ "$ac" -eq 0 ]; then
-  ac_str="false"
-fi
+pull_request=$(az repos pr create --detect --auto-complete $ac --delete-source-branch true --description "$desc" --repository "$rep" --source-branch "$bn" --squash true --target-branch "$tb" --title "$tit" --output json --work-items "$wi")
 
 draft_str="false"
 if [ "$draft" -eq 1 ]; then
