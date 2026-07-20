@@ -12,61 +12,6 @@ optMode=0   # 1 = true, 0 = false
 gitEditor=$(git config core.editor)
 
 tb=$(git rev-parse --abbrev-ref origin/HEAD | cut -c8-)
-<<<<<<< HEAD
-
-############################################################
-# Help                                                     #
-############################################################
-Help() {
-  cat << EOF
-Makes a pull request in Azure DevOps
-
-Syntax: prcurrent [-t|d|n|r|m|h]
-
-Options:
-  -t <Title>             Set the Pull Request title.
-  -d <Description>       Set the Pull Request description.
-  -n <DevOps Ticket #>   Set the ticket number.
-  -r                     Set the Pull Request to draft mode.
-  -m                     Use manual complete mode (disable auto-complete).
-  -h                     Show this help message.
-
-EOF
-}
-
-############################################################
-# Set PR Vars                                              #
-############################################################
-SetVars() {
-  if [ -z "$tit" ]; then
-    read -rp "PR Title: " tit
-  fi
-
-  if [ "$optMode" -eq 0 ] && [ -z "$desc" ]; then
-    # Open editor to enter description
-    tmpfile=$(mktemp /tmp/prdesc.XXXXXX)
-    ${gitEditor:-vim} "$tmpfile"
-    desc=$(<"$tmpfile")
-    rm -f "$tmpfile"
-  fi
-
-  if [ -z "$wi" ]; then
-    read -rp "Work Item Number(s): " wi
-  fi
-
-  if [ "$optMode" -eq 0 ] && [ -z "$useAc" ]; then
-    read -rp "Use Auto Complete [Y]: " useAc
-    useAc=${useAc:-Y}
-    if [[ "$useAc" != "Y" && "$useAc" != "y" ]]; then
-      ac=0
-    fi
-  fi
-}
-############################################################
-
-OPTIND=1
-=======
->>>>>>> 1ca3623 (Updates PR Current to use git configured editor for descriptions for PRs + fixes az account check)
 
 ############################################################
 # Help                                                     #
@@ -219,8 +164,4 @@ echo '⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠻⢿⣶⣤⣀⡉⠙⠓�
 echo '⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠛⠻⠿⣶⣶⣦⣤⣤⣤⣤⣤⣤⣤⣴⣶⣶⡿⠿⠛⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀'
 echo '⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠉⠉⠉⠉⠉⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀'
 
-<<<<<<< HEAD
 echo "$joined"
-=======
-echo "$joined"
->>>>>>> 1ca3623 (Updates PR Current to use git configured editor for descriptions for PRs + fixes az account check)
