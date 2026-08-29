@@ -10,6 +10,7 @@ ac=1        # 1 = true (auto-complete), 0 = false
 draft=0     # 1 = true, 0 = false
 optMode=0   # 1 = true, 0 = false
 gitEditor=$(git config core.editor)
+
 tb=$(git rev-parse --abbrev-ref origin/HEAD | cut -c8-)
 
 ############################################################
