@@ -19,22 +19,23 @@ die() { echo "tprs: $*" >&2; exit 1; }
 
 usage() {
   cat <<'USAGE'
-usage: tprs [-m] [-r] [-c] [-D] [-u] [-R repo] [-t [ID]] [QUERY]
+usage: tprs [-m] [-r] [-c] [-D] [-N] [-u] [-R repo] [-t [ID]] [QUERY]
 
 List active pull requests in an Azure DevOps project. Drafts are tagged DRAFT.
 The APPROVERS column holds the initials of everyone who approved; !XX rejected,
-~XX is waiting on the author.
+~XX is waiting on the author. CMTS is unresolved/total comment threads.
 
-  QUERY            case-insensitive substring on repo name or title
-  -m, --mine       only PRs I created
-  -r, --review     only PRs where I am a reviewer and have not voted
-  -c, --cwd        only PRs for the repo I am standing in
-  -D, --no-drafts  hide drafts
-  -u, --url        show the PR URL instead of the title
-  -R, --repo REPO  only this repo (substring)
-  -t, --tuicr [ID] open a PR in tuicr via tpr. Bare -t picks from the list,
-                   -t 2063 skips the picker
-  -h, --help       this
+  QUERY              case-insensitive substring on repo name or title
+  -m, --mine         only PRs I created
+  -r, --review       only PRs where I am a reviewer and have not voted
+  -c, --cwd          only PRs for the repo I am standing in
+  -D, --no-drafts    hide drafts
+  -N, --no-comments  skip the comment counts (one request per PR listed)
+  -u, --url          show the PR URL instead of the title
+  -R, --repo REPO    only this repo (substring)
+  -t, --tuicr [ID]   open a PR in tuicr via tpr. Bare -t picks from the list,
+                     -t 2063 skips the picker
+  -h, --help         this
 
 Env:
   TPRS_ORG       org, default: origin's org, else encoura
@@ -42,6 +43,7 @@ Env:
   TPRS_ME        who mine/review means, default: git config user.email
   TPRS_TOP       max PRs to ask for (default 200)
   TPRS_JSON      read PR json from this file instead of calling az (testing)
+  AZURE_DEVOPS_EXT_PAT  needed for comment counts (same PAT tuicr uses)
   TPR_ROOT       repo root for -t (default ~/source/repos)
   TPR_PICKER     'fzf' (default when installed) or 'select' bash builtin
 USAGE
@@ -51,6 +53,7 @@ mine=0
 needs_review=0
 cwd_only=0
 hide_drafts=0
+no_comments=0
 show_url=0
 handoff=0
 repo_filter=''
@@ -63,6 +66,7 @@ while (($#)); do
     -r|--review)    needs_review=1 ;;
     -c|--cwd)       cwd_only=1 ;;
     -D|--no-drafts) hide_drafts=1 ;;
+    -N|--no-comments) no_comments=1 ;;
     -u|--url)       show_url=1 ;;
     -R|--repo)      shift; [[ $# -gt 0 ]] || die "-R needs a repo name"; repo_filter="$1" ;;
     -t|--tuicr)     handoff=1
@@ -177,7 +181,8 @@ rows=$(jq -r \
         ($pr.createdBy.displayName // "?"),
         ($title | gsub("[\\t\\r\\n]+"; " ")),
         "https://dev.azure.com/\($org)/\($project|@uri)/_git/\($repo|@uri)/pullrequest/\($pr.pullRequestId)",
-        ($pr.reviewers | votes)
+        ($pr.reviewers | votes),
+        ($pr.repository.id // "")  # hidden: only for the threads fetch
       ]
   ]
   | sort_by(.[0] | tonumber) | reverse
@@ -188,6 +193,65 @@ if [[ -z $rows ]]; then
   echo "tprs: no open PRs match" >&2
   exit 0
 fi
+
+# --- comment counts --------------------------------------------------------
+# Thread counts are per-PR, so this is one request each. The PAT path (the same
+# one tuicr prefers) is ~0.2s per PR against az devops invoke's ~5s, so counts
+# are only offered when a PAT is set. Field 8 carries the repo id in; it comes
+# back out holding the rendered cell.
+pat="${AZURE_DEVOPS_EXT_PAT:-${AZURE_DEVOPS_PAT:-}}"
+counts=''
+
+if ((! no_comments)) && [[ -n $pat ]] && command -v curl >/dev/null 2>&1; then
+  thr=$(mktemp -d) || die "could not make a temp dir"
+  trap 'rm -rf "$thr"' EXIT
+  project_uri=${project// /%20}
+
+  jobs_run=0
+  while IFS=$'\t' read -r cid crid; do
+    # msys hands back a trailing CR often enough to break the url outright
+    cid=${cid%$'\r'}; crid=${crid%$'\r'}
+    [[ -n $cid && -n $crid ]] || continue
+    curl -sf --max-time 10 -u ":$pat" -H 'Accept: application/json' \
+      "https://dev.azure.com/$org/$project_uri/_apis/git/repositories/$crid/pullRequests/$cid/threads?api-version=7.1" \
+      -o "$thr/$cid.json" </dev/null &
+    jobs_run=$((jobs_run + 1))
+    ((jobs_run % 8 == 0)) && wait
+  done < <(printf '%s\n' "$rows" | cut -f1,8)
+  wait
+
+  # same rules as tuicr: drop deleted threads and system-only ones (votes,
+  # policy, branch pushes), and treat fixed/closed/wontFix/byDesign as resolved
+  shopt -s nullglob
+  thr_files=("$thr"/*.json)
+  shopt -u nullglob
+  if ((${#thr_files[@]})); then
+    counts=$(jq -rn '
+      def human: [ .comments[]?
+        | select(((.isDeleted // false) | not)
+            and ((.content // "") != "")
+            and (((.commentType // "") | ascii_downcase) != "system")) ] | length > 0;
+      def open_thread: ((.status // "") | ascii_downcase) as $s
+        | ($s == "fixed" or $s == "closed" or $s == "wontfix" or $s == "bydesign") | not;
+      inputs
+      | (input_filename | sub(".*/"; "") | sub("[.]json$"; "")) as $id
+      | [ .value[]? | select((.isDeleted // false) | not) | select(human) ] as $t
+      | ($t | length) as $total
+      | "\($id)\t" + (if $total == 0 then "" else "\($t | map(select(open_thread)) | length)/\($total)" end)
+    ' "${thr_files[@]}" 2>/dev/null)
+  fi
+  rm -rf "$thr"
+  trap - EXIT
+elif ((! no_comments)) && [[ -z $pat ]]; then
+  echo "tprs: no AZURE_DEVOPS_EXT_PAT, skipping comment counts (-N to silence)" >&2
+fi
+
+# Field 8 becomes the comment cell: the count, blank when the PR has none or
+# counts are off, "?" when that one fetch failed.
+rows=$(awk -F'\t' -v OFS='\t' -v on="$([[ -n $counts ]] && echo 1 || echo 0)" '
+  NR == FNR { c[$1] = $2; seen[$1] = 1; next }
+  { $8 = on ? (($1 in seen) ? c[$1] : "?") : ""; print }
+' <(printf '%s\n' "$counts") <(printf '%s\n' "$rows"))
 
 # --- render -----------------------------------------------------------------
 c_bold=''; c_draft=''; c_bad=''; c_off=''
@@ -208,6 +272,11 @@ render() {
     function pad(s, w) { while (length(s) < w) s = s " "; return s }
     function clip(s, w) { return (w > 3 && length(s) > w) ? substr(s, 1, w - 3) "..." : s }
     # color the !/~ tokens, then pad on the PLAIN length - escapes have no width
+    function pad_one(s, w, col,   out, p) {
+      out = (col == "" ? s : col s co); p = length(s)
+      while (p++ < w) out = out " "
+      return out
+    }
     function pad_votes(cell, w,   k, t, i, out, plain, tok, col) {
       k = split(cell, t, " ")
       out = ""; plain = 0
@@ -220,16 +289,18 @@ render() {
       while (plain++ < w) out = out " "
       return out
     }
-    BEGIN { FS = "\t"; n = 0; w1 = 2; w2 = 4; w4 = 6; w5 = 0; anydraft = 0 }
+    BEGIN { FS = "\t"; n = 0; w1 = 2; w2 = 4; w4 = 6; w5 = 0; w6 = 0; anydraft = 0 }
     {
       id[n] = $1; repo[n] = $2; flag[n] = $3
       auth[n] = clip($4, 18)
       last[n] = (showurl ? $6 : $5)
       appr[n] = clip($7, 16)
+      cmts[n] = $8
       if (length(id[n])   > w1) w1 = length(id[n])
       if (length(repo[n]) > w2) w2 = length(repo[n])
       if (length(auth[n]) > w4) w4 = length(auth[n])
       if (length(appr[n]) > w5) w5 = length(appr[n])
+      if (length(cmts[n]) > w6) w6 = length(cmts[n])
       if (flag[n] != "") anydraft = 1
       n++
     }
@@ -238,13 +309,16 @@ render() {
       fw = anydraft ? 7 : 0
       if (w5 > 0 && w5 < length("APPROVERS")) w5 = length("APPROVERS")
       aw = w5 ? w5 + 2 : 0
-      avail = width - (w1 + 2) - (w2 + 2) - fw - (w4 + 2) - aw
+      if (w6 > 0 && w6 < length("CMTS")) w6 = length("CMTS")
+      cw = w6 ? w6 + 2 : 0
+      avail = width - (w1 + 2) - (w2 + 2) - fw - (w4 + 2) - aw - cw
       if (avail < 24) avail = 24
       if (pretty) {
         h = pad("PR", w1) "  " pad("REPO", w2) "  "
         if (anydraft) h = h pad("", 7)
         h = h pad("AUTHOR", w4) "  "
         if (w5) h = h pad("APPROVERS", w5) "  "
+        if (w6) h = h pad("CMTS", w6) "  "
         print cb h (showurl ? "URL" : "TITLE") co
       }
       for (i = 0; i < n; i++) {
@@ -255,6 +329,9 @@ render() {
         }
         line = line pad(auth[i], w4) "  "
         if (w5) line = line (pretty ? pad_votes(appr[i], w5) : pad(appr[i], w5)) "  "
+        # a nonzero unresolved count is the part worth looking at
+        if (w6) line = line pad_one(cmts[i], w6,
+          (pretty && cmts[i] ~ /^[1-9]/) ? cd : "") "  "
         # urls stay whole so they remain clickable and copyable
         line = line (showurl ? last[i] : clip(last[i], avail))
         print line

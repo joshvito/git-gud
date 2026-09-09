@@ -116,6 +116,11 @@ The APPROVERS column holds the initials of everyone who has voted: bare initials
 rejected, `~XX` waiting on the author. Reviewers who have not voted are left out, and the required
 `ADO-Engage-Pull-Request-Reviewers` team is skipped - it is a policy, not a person. Blockers sort
 first, and the column disappears when nothing in view has a vote.
+CMTS is unresolved/total comment threads, counted the way tuicr counts them: deleted and
+system-only threads (votes, policy, pushes) do not count, and fixed/closed/wontFix/byDesign
+count as resolved. Threads are per-PR, so this is one request per PR listed - about 1.5s for ten.
+It uses `AZURE_DEVOPS_EXT_PAT` (the PAT tuicr already wants); without one the column is skipped,
+and `-N` turns it off. A cell reads `?` when that PR's request failed.
 ```
 tprs              # every open PR in the project
 tprs -m           # only mine
@@ -131,6 +136,7 @@ tprs -t 2063      # straight to that PR
 | -r | Only PRs where I am a reviewer and have not voted |
 | -c | Only PRs for the repo I am standing in |
 | -D | Hide drafts |
+| -N | Skip the comment counts |
 | -u | Show the PR URL instead of the title |
 | -R | Only this repo (substring) |
 | -t | Open a PR in tuicr via `tpr`; takes an optional PR id |
@@ -142,6 +148,7 @@ tprs -t 2063      # straight to that PR
 | TPRS_ME | Who `-m`/`-r` mean, default: `git config user.email` |
 | TPRS_TOP | Max PRs to ask for, default 200 |
 | TPRS_JSON | Read PR json from this file instead of calling az (testing) |
+| AZURE_DEVOPS_EXT_PAT | Needed for the CMTS column (same PAT tuicr uses) |
 #### Requires:
 * Azure Cli
 * jq
