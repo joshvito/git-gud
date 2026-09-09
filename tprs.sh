@@ -22,6 +22,8 @@ usage() {
 usage: tprs [-m] [-r] [-c] [-D] [-u] [-R repo] [-t [ID]] [QUERY]
 
 List active pull requests in an Azure DevOps project. Drafts are tagged DRAFT.
+The APPROVERS column holds the initials of everyone who approved; !XX rejected,
+~XX is waiting on the author.
 
   QUERY            case-insensitive substring on repo name or title
   -m, --mine       only PRs I created
@@ -39,6 +41,7 @@ Env:
   TPRS_PROJECT   project, default: origin's project, else engage
   TPRS_ME        who mine/review means, default: git config user.email
   TPRS_TOP       max PRs to ask for (default 200)
+  TPRS_JSON      read PR json from this file instead of calling az (testing)
   TPR_ROOT       repo root for -t (default ~/source/repos)
   TPR_PICKER     'fzf' (default when installed) or 'select' bash builtin
 USAGE
@@ -125,18 +128,36 @@ fi
 # --- fetch ------------------------------------------------------------------
 # --detect false: without it az guesses org/project from the cwd and fails
 # outright when you are not standing in a repo.
-prs=$(az repos pr list --only-show-errors --detect false \
-  --org "https://dev.azure.com/$org/" --project "$project" \
-  --status active --top "${TPRS_TOP:-200}" -o json) \
-  || die "could not list pull requests in $org/$project"
+if [[ -n ${TPRS_JSON:-} ]]; then
+  [[ -f $TPRS_JSON ]] || die "no such file: $TPRS_JSON"
+  prs=$(cat "$TPRS_JSON") || die "could not read $TPRS_JSON"
+else
+  prs=$(az repos pr list --only-show-errors --detect false \
+    --org "https://dev.azure.com/$org/" --project "$project" \
+    --status active --top "${TPRS_TOP:-200}" -o json) \
+    || die "could not list pull requests in $org/$project"
+fi
 
 # --- filter + shape ---------------------------------------------------------
-# One row per PR: id, repo, DRAFT flag, author, title, url. Newest first.
+# One row per PR: id, repo, DRAFT flag, author, title, url, approvers.
+# Newest first.
 rows=$(jq -r \
   --arg me "$me" --arg q "$query" --arg rf "$repo_filter" \
   --arg org "$org" --arg project "$project" \
   --argjson mine "$mine" --argjson review "$needs_review" --argjson nodrafts "$hide_drafts" '
   def lc: ascii_downcase;
+  # "Federico Vela Garcia" -> FVG, "Josh Vito" -> JV
+  def initials: [splits("[ ,._-]+")]
+    | map(select(length > 0) | .[0:1] | ascii_upcase) | .[0:3] | join("");
+  # rejections and change-requests sort first so they survive a clipped cell
+  def votes: [ (. // [])[]
+      | select((.isContainer // false) | not)
+      | select((.vote // 0) != 0)
+      | if .vote <= -10 then { rank: 0, token: "!" + (.displayName // "?" | initials) }
+        elif .vote < 0   then { rank: 1, token: "~" + (.displayName // "?" | initials) }
+        else                  { rank: 2, token:       (.displayName // "?" | initials) }
+        end ]
+    | sort_by(.rank) | map(.token) | join(" ");
   [ .[]
     | . as $pr
     | ($pr.repository.name // "?") as $repo
@@ -155,7 +176,8 @@ rows=$(jq -r \
         (if ($pr.isDraft // false) then "DRAFT" else "" end),
         ($pr.createdBy.displayName // "?"),
         ($title | gsub("[\\t\\r\\n]+"; " ")),
-        "https://dev.azure.com/\($org)/\($project|@uri)/_git/\($repo|@uri)/pullrequest/\($pr.pullRequestId)"
+        "https://dev.azure.com/\($org)/\($project|@uri)/_git/\($repo|@uri)/pullrequest/\($pr.pullRequestId)",
+        ($pr.reviewers | votes)
       ]
   ]
   | sort_by(.[0] | tonumber) | reverse
@@ -168,10 +190,11 @@ if [[ -z $rows ]]; then
 fi
 
 # --- render -----------------------------------------------------------------
-c_bold=''; c_draft=''; c_off=''
+c_bold=''; c_draft=''; c_bad=''; c_off=''
 if [[ -t 1 ]]; then
   c_bold=$(tput bold 2>/dev/null || true)
   c_draft=$(tput setaf 3 2>/dev/null || true)
+  c_bad=$(tput setaf 1 2>/dev/null || true)
   c_off=$(tput sgr0 2>/dev/null || true)
 fi
 
@@ -181,29 +204,48 @@ if ((width == 0)); then width=$(tput cols 2>/dev/null || echo 100); fi
 render() {
   # $1: 1 = header + colors, 0 = plain rows only (picker input)
   awk -v pretty="$1" -v showurl="$show_url" -v width="$width" \
-      -v cb="$c_bold" -v cd="$c_draft" -v co="$c_off" '
+      -v cb="$c_bold" -v cd="$c_draft" -v cbad="$c_bad" -v co="$c_off" '
     function pad(s, w) { while (length(s) < w) s = s " "; return s }
     function clip(s, w) { return (w > 3 && length(s) > w) ? substr(s, 1, w - 3) "..." : s }
-    BEGIN { FS = "\t"; n = 0; w1 = 2; w2 = 4; w4 = 6; anydraft = 0 }
+    # color the !/~ tokens, then pad on the PLAIN length - escapes have no width
+    function pad_votes(cell, w,   k, t, i, out, plain, tok, col) {
+      k = split(cell, t, " ")
+      out = ""; plain = 0
+      for (i = 1; i <= k; i++) {
+        tok = t[i]
+        col = (substr(tok, 1, 1) == "!") ? cbad : (substr(tok, 1, 1) == "~") ? cd : ""
+        out = out (i > 1 ? " " : "") (col == "" ? tok : col tok co)
+        plain += length(tok) + (i > 1 ? 1 : 0)
+      }
+      while (plain++ < w) out = out " "
+      return out
+    }
+    BEGIN { FS = "\t"; n = 0; w1 = 2; w2 = 4; w4 = 6; w5 = 0; anydraft = 0 }
     {
       id[n] = $1; repo[n] = $2; flag[n] = $3
       auth[n] = clip($4, 18)
       last[n] = (showurl ? $6 : $5)
+      appr[n] = clip($7, 16)
       if (length(id[n])   > w1) w1 = length(id[n])
       if (length(repo[n]) > w2) w2 = length(repo[n])
       if (length(auth[n]) > w4) w4 = length(auth[n])
+      if (length(appr[n]) > w5) w5 = length(appr[n])
       if (flag[n] != "") anydraft = 1
       n++
     }
     END {
-      # the flag column only exists when something in view is a draft
+      # a column only exists when something in view fills it
       fw = anydraft ? 7 : 0
-      avail = width - (w1 + 2) - (w2 + 2) - fw - (w4 + 2)
+      if (w5 > 0 && w5 < length("APPROVERS")) w5 = length("APPROVERS")
+      aw = w5 ? w5 + 2 : 0
+      avail = width - (w1 + 2) - (w2 + 2) - fw - (w4 + 2) - aw
       if (avail < 24) avail = 24
       if (pretty) {
         h = pad("PR", w1) "  " pad("REPO", w2) "  "
         if (anydraft) h = h pad("", 7)
-        print cb h pad("AUTHOR", w4) "  " (showurl ? "URL" : "TITLE") co
+        h = h pad("AUTHOR", w4) "  "
+        if (w5) h = h pad("APPROVERS", w5) "  "
+        print cb h (showurl ? "URL" : "TITLE") co
       }
       for (i = 0; i < n; i++) {
         line = pad(id[i], w1) "  " pad(repo[i], w2) "  "
@@ -211,8 +253,10 @@ render() {
           if (flag[i] != "") line = line (pretty ? cd "DRAFT" co "  " : "DRAFT  ")
           else               line = line pad("", 7)
         }
+        line = line pad(auth[i], w4) "  "
+        if (w5) line = line (pretty ? pad_votes(appr[i], w5) : pad(appr[i], w5)) "  "
         # urls stay whole so they remain clickable and copyable
-        line = line pad(auth[i], w4) "  " (showurl ? last[i] : clip(last[i], avail))
+        line = line (showurl ? last[i] : clip(last[i], avail))
         print line
       }
     }

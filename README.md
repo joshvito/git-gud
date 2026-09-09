@@ -112,6 +112,10 @@ Lists every active pull request in an Azure DevOps project - all repos in one ta
 Drafts are tagged `DRAFT`, which the ADO web list does not do. Org and project come from `origin` when
 you are standing in a repo, otherwise they default to `encoura`/`engage`, so it also works from `~`.
 `-t` hands the picked PR to `tpr`, which does the cd + fetch + open in `tuicr`.
+The APPROVERS column holds the initials of everyone who has voted: bare initials approved, `!XX`
+rejected, `~XX` waiting on the author. Reviewers who have not voted are left out, and the required
+`ADO-Engage-Pull-Request-Reviewers` team is skipped - it is a policy, not a person. Blockers sort
+first, and the column disappears when nothing in view has a vote.
 ```
 tprs              # every open PR in the project
 tprs -m           # only mine
@@ -137,6 +141,7 @@ tprs -t 2063      # straight to that PR
 | TPRS_PROJECT | Project, default: `origin`'s project, else `engage` |
 | TPRS_ME | Who `-m`/`-r` mean, default: `git config user.email` |
 | TPRS_TOP | Max PRs to ask for, default 200 |
+| TPRS_JSON | Read PR json from this file instead of calling az (testing) |
 #### Requires:
 * Azure Cli
 * jq
