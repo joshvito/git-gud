@@ -23,7 +23,7 @@ alias gbpurge='source ~/.util/gbpurge.sh'
 alias prcurrent='source ~/.util/pr-current.sh'
 alias rmgone='source ~/.util/rmgone.sh'
 alias repoizer='source ~/.util/repoizer.sh'
-alias pipelinerizer='source ~/.util/pipelinerizer.sh'
+alias pipelinerizer='bash ~/.util/pipelinerizer.sh'
 alias buildizer='bash ~/.util/buildizer.sh'
 alias qb='bash ~/.util/buildizer.sh'
 alias tpr='bash ~/.util/tpr.sh'
@@ -79,7 +79,17 @@ A bash script for setting up new Engage repos. Follows the Student Engagement [W
 * Git
 
 ### pipelinerizer.sh
-A bash script that searches the Engage project for pipelines by name and runs each of them against the `main` branch.
+A bash script that searches the Engage project for pipelines by name and queues every match on one branch (`main` by default).
+With no search flag it prompts for a term, defaulting to `Terraform`.
+#### Optional Flags:
+| Flag | Description |
+| :------: | ----------- |
+| -t | Pipelines whose name contains this term (case sensitive) |
+| -q | Raw JMESPATH `az --query`, must return a list of names |
+| -p | jq regex over every pipeline name; wins over `-q` and `-t` |
+| -b | Branch to queue (default `main`) |
+| -n | Dry run - list matches, queue nothing |
+| -y | No prompt |
 #### Requires:
 * Azure Cli
 * jq
