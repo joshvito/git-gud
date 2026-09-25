@@ -68,7 +68,17 @@ Called from `prunerizer.js`, it will checkout the HEAD's branch, and delete any 
 Called from `prunerizer.js`, it will checkout the HEAD's branch, and delete any local branches that are deleted, aka `[gone]`;
 
 ### pipelinerizer.sh
-A bash script that searches the Engage project for pipelines by name and runs each of them against the `main` branch.
+A bash script that searches the Engage project for pipelines by name and queues every match on one branch (`main` by default).
+With no search flag it prompts for a term, defaulting to `Terraform`.
+#### Optional Flags:
+| Flag | Description |
+| :------: | ----------- |
+| -t | Pipelines whose name contains this term (case sensitive) |
+| -q | Raw JMESPATH `az --query`, must return a list of names |
+| -p | jq regex over every pipeline name; wins over `-q` and `-t` |
+| -b | Branch to queue (default `main`) |
+| -n | Dry run - list matches, queue nothing |
+| -y | No prompt |
 #### Requires:
 * Azure Cli
 * jq
