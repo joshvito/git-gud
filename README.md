@@ -5,9 +5,7 @@ A collection of often used git related scripts
 * Nodejs
 * bash shell
 * git
-* az cli (pr-current.sh, repoizer.sh, pipelinerizer.sh, buildizer.sh)
-* Terraform (repoizer.sh)
-* Terragrunt (repoizer.sh)
+* az cli (pr-current.sh, pipelinerizer.sh, buildizer.sh)
 * jq (pipelinerizer.sh, pr-current.sh, buildizer.sh) 
 
 ## Setup Instructions
@@ -22,8 +20,7 @@ A collection of often used git related scripts
 alias gbpurge='source ~/.util/gbpurge.sh'
 alias prcurrent='source ~/.util/pr-current.sh'
 alias rmgone='source ~/.util/rmgone.sh'
-alias repoizer='source ~/.util/repoizer.sh'
-alias pipelinerizer='bash ~/.util/pipelinerizer.sh'
+alias pipelinerizer='source ~/.util/pipelinerizer.sh'
 alias buildizer='bash ~/.util/buildizer.sh'
 alias qb='bash ~/.util/buildizer.sh'
 alias tpr='bash ~/.util/tpr.sh'
@@ -69,14 +66,6 @@ Called from `prunerizer.js`, it will checkout the HEAD's branch, and delete any 
 
 ### rmgone.sh 
 Called from `prunerizer.js`, it will checkout the HEAD's branch, and delete any local branches that are deleted, aka `[gone]`;
-
-### repoizer.sh
-A bash script for setting up new Engage repos. Follows the Student Engagement [Wiki document](https://dev.azure.com/campuslabs/Student%20Engagement/_wiki/wikis/Student-Engagement.wiki/1242/Repository-From-Scratch)
-#### Requires:
-* Terraform
-* Terragrunt
-* Azure Cli
-* Git
 
 ### pipelinerizer.sh
 A bash script that searches the Engage project for pipelines by name and queues every match on one branch (`main` by default).
