@@ -46,7 +46,8 @@ fs.readdir(directoryPath, {withFileTypes: true}, async (err, entries) => {
         .filter(d => d.name.indexOf('.nuget') === -1)
         .filter(d => d.name.indexOf('System Volume Information') === -1);
                 
-    directories.forEach(async dirent => {
+    // Sequential: parallel runs race on ~/.gitconfig and fail with "Permission denied".
+    for (const dirent of directories) {
         const _path = path.join(directoryPath, dirent.name);
         console.log(`[Turning on maintenance for]: ${dirent.name}; ${_path}`);
         try{
@@ -54,7 +55,7 @@ fs.readdir(directoryPath, {withFileTypes: true}, async (err, entries) => {
         } catch (e) {
             console.error(e);
         }
-    });
+    }
 
     console.log('Repos under maintenance: ');
     const result = await ListGitMaintenanceRepos(path.join(directoryPath));
